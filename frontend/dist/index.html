@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SalesPilot AI — Autonomous AI Sales Voice Agent</title>
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/livekit-client@2.15.4/dist/livekit-client.umd.min.js" defer></script>
+</head>
+<body>
+
+<!-- ============ AUTH VIEW ============ -->
+<div id="authView" class="auth-wrap hidden">
+  <div class="auth-card">
+    <div class="brand brand-center">
+      <span class="brand-mark" data-icon="pilot"></span>
+      <span class="brand-name">SalesPilot <em>AI</em></span>
+    </div>
+    <p class="auth-sub">Autonomous AI sales voice agents for your team.</p>
+    <div class="auth-tabs">
+      <button id="tabLogin" class="auth-tab active" type="button">Sign in</button>
+      <button id="tabRegister" class="auth-tab" type="button">Create account</button>
+    </div>
+    <form id="loginForm" class="auth-form">
+      <label>Email<input type="email" id="loginEmail" required autocomplete="email" placeholder="you@company.com"></label>
+      <label>Password<input type="password" id="loginPassword" required autocomplete="current-password" placeholder="••••••••"></label>
+      <div class="auth-error" id="loginError"></div>
+      <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+    </form>
+    <form id="registerForm" class="auth-form hidden">
+      <label>Organization name<input type="text" id="regOrg" required placeholder="Acme Inc."></label>
+      <label>Email<input type="email" id="regEmail" required autocomplete="email" placeholder="you@company.com"></label>
+      <label>Password<input type="password" id="regPassword" required autocomplete="new-password" placeholder="Choose a strong password"></label>
+      <div class="auth-error" id="registerError"></div>
+      <button class="btn btn-primary btn-block" type="submit">Create account</button>
+    </form>
+    <p class="auth-foot">Your data is isolated to your organization. API keys live only in server environment variables — never in this app.</p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appView" class="shell hidden">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <span class="brand-mark" data-icon="pilot"></span>
+      <span class="brand-name">SalesPilot <em>AI</em></span>
+    </div>
+    <div class="org-chip" id="orgChip" title="Current organization">—</div>
+    <nav class="nav">
+      <div class="nav-section">Overview</div>
+      <a class="nav-item" data-nav="dashboard"><span data-icon="grid"></span>Dashboard</a>
+      <div class="nav-section">Sales</div>
+      <a class="nav-item" data-nav="leads"><span data-icon="users"></span>Leads</a>
+      <a class="nav-item" data-nav="calls"><span data-icon="phone"></span>Call History</a>
+      <a class="nav-item" data-nav="appointments"><span data-icon="phone"></span>Appointments</a>
+      <a class="nav-item" data-nav="tasks"><span data-icon="edit"></span>Tasks</a>
+      <div class="nav-section">AI Workspace</div>
+      <a class="nav-item" data-nav="agents"><span data-icon="bot"></span>AI Agents</a>
+      <a class="nav-item" data-nav="voice"><span data-icon="mic"></span>Live Voice Testing</a>
+      <a class="nav-item" data-nav="kb"><span data-icon="sparkles"></span>Knowledge Base</a>
+      <a class="nav-item" data-nav="analytics"><span data-icon="grid"></span>Analytics</a>
+      <div class="nav-section">Settings</div>
+      <a class="nav-item" data-nav="integrations"><span data-icon="plug"></span>Integrations</a>
+      <a class="nav-item" data-nav="organization"><span data-icon="building"></span>Organization</a>
+      <a class="nav-item" data-nav="compliance"><span data-icon="eye"></span>Compliance &amp; Launch</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip"><span data-icon="user"></span><span id="userEmail">—</span></div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="icon-btn only-mobile" id="menuBtn" type="button" aria-label="Menu"><span data-icon="menu"></span></button>
+      <h1 id="pageTitle">Dashboard</h1>
+      <div class="topbar-right"><span class="env-badge" id="apiBadge">API /api/v1</span></div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section class="view" id="view-dashboard">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="kpi-grid" id="dashFullTiles"></div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="card"><div class="card-head"><h3>Qualification distribution</h3></div><div id="chartQual" class="chart-box"></div></div>
+        <div class="card"><div class="card-head"><h3>Sentiment distribution</h3></div><div id="chartSentiment" class="chart-box"></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Leads by status</h3></div>
+          <div id="chartStatus" class="chart-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Lead sources</h3></div>
+          <div id="chartSource" class="chart-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Calls by outcome</h3></div>
+          <div id="chartOutcome" class="chart-box"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Languages</h3></div>
+          <div id="chartLanguage" class="chart-box"></div>
+        </div>
+      </div>
+      <div class="card hidden" id="dashEmpty">
+        <div class="empty">
+          <span data-icon="sparkles" class="empty-icon"></span>
+          <h3>Nothing here yet — and that's the truth</h3>
+          <p>Every number on this dashboard is computed from your real stored leads and calls. Add your first lead or import a CSV to see it come alive.</p>
+          <button class="btn btn-primary" data-goto="leads" type="button">Go to Leads</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- LEADS -->
+    <section class="view hidden" id="view-leads">
+      <div class="toolbar">
+        <div class="toolbar-group grow">
+          <input type="search" id="leadSearch" placeholder="Search name, company, phone, email…">
+          <select id="leadFilterStatus"><option value="">All statuses</option></select>
+          <select id="leadFilterSource"><option value="">All sources</option></select>
+          <select id="leadFilterLanguage">
+            <option value="">All languages</option><option>English</option><option>Hindi</option><option>Hinglish</option>
+          </select>
+        </div>
+        <div class="toolbar-group">
+          <label class="btn btn-ghost file-btn">Import CSV<input type="file" id="csvFile" accept=".csv,text/csv" hidden></label>
+          <button class="btn btn-primary" id="addLeadBtn" type="button">+ Add lead</button>
+        </div>
+      </div>
+      <div id="importBar" class="import-bar hidden"></div>
+      <div class="card table-card">
+        <table class="table" id="leadsTable">
+          <thead><tr><th>Name</th><th>Company</th><th>Phone</th><th>Status</th><th>Score</th><th>Language</th><th>Source</th><th></th></tr></thead>
+          <tbody id="leadsTbody"></tbody>
+        </table>
+        <div class="empty hidden" id="leadsEmpty"><p>No leads match. Add one manually or import a CSV.</p></div>
+      </div>
+    </section>
+
+    <!-- AGENTS -->
+    <section class="view hidden" id="view-agents">
+      <div class="toolbar">
+        <div class="toolbar-group grow"><p class="muted">Configure the AI sales agents that talk to your leads.</p></div>
+        <button class="btn btn-primary" id="addAgentBtn" type="button">+ New agent</button>
+      </div>
+      <div class="cards-grid" id="agentsGrid"></div>
+      <div class="empty hidden" id="agentsEmpty"><p>No agents yet. Create your first AI sales agent.</p></div>
+    </section>
+
+    <!-- VOICE -->
+    <section class="view hidden" id="view-voice">
+      <div class="grid-2 voice-grid">
+        <div class="card">
+          <div class="card-head"><h3>Session setup</h3></div>
+          <label>AI agent<select id="voiceAgent"></select></label>
+          <label>Lead (optional)<select id="voiceLead"><option value="">— No lead —</option></select></label>
+          <label>Language
+            <select id="voiceLang"><option>English</option><option>Hindi</option><option>Hinglish</option></select>
+          </label>
+          <div class="seg">
+            <button type="button" class="seg-btn active" id="modeTurnBtn">Turn-based</button>
+            <button type="button" class="seg-btn" id="modeLivekitBtn">LiveKit live</button>
+          </div>
+          <p class="muted small" id="modeHint">Turn-based: hold the mic button, speak, release — the agent transcribes, thinks and speaks back. Works anywhere this page can reach the API.</p>
+          <div class="voice-actions">
+            <button class="btn btn-primary" id="startSessionBtn" type="button">Start session</button>
+            <button class="btn btn-danger hidden" id="endSessionBtn" type="button">End session</button>
+          </div>
+          <div class="session-meta" id="sessionMeta">No active session.</div>
+          <div id="voiceContext" class="hidden" style="margin-top:12px"></div>
+          <div id="micZone" class="mic-zone hidden">
+            <button class="mic-btn" id="micBtn" type="button"><span data-icon="mic"></span></button>
+            <div class="mic-label" id="micLabel">Hold to talk</div>
+            <div class="mic-state" id="micState"></div>
+          </div>
+          <div id="livekitZone" class="mic-zone hidden">
+            <div class="lk-state" id="lkState">Not connected.</div>
+            <div class="mic-label">LiveKit room — your mic is published live when connected.</div>
+          </div>
+          <div class="voice-error" id="voiceError"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Live transcript</h3><span class="badge" id="transcriptBadge">Idle</span></div>
+          <div class="transcript" id="transcriptBox">
+            <div class="empty small-empty"><p>Start a session and speak — the conversation will appear here, and everything is saved to Call History.</p></div>
+          </div>
+          <audio id="replyAudio" controls class="reply-audio hidden"></audio>
+        </div>
+      </div>
+    </section>
+
+    <!-- CALLS -->
+    <section class="view hidden" id="view-calls">
+      <div class="card table-card">
+        <table class="table" id="callsTable">
+          <thead><tr><th>Started</th><th>Agent</th><th>Lead</th><th>Language</th><th>Mode</th><th>Outcome</th><th>Duration</th><th></th></tr></thead>
+          <tbody id="callsTbody"></tbody>
+        </table>
+        <div class="empty hidden" id="callsEmpty"><p>No calls yet. Run a session in Live Voice Testing.</p></div>
+      </div>
+    </section>
+
+    <!-- INTEGRATIONS -->
+    <section class="view hidden" id="view-integrations">
+      <div class="cards-grid" id="integrationsGrid"></div>
+      <div id="integrationsExtra" style="margin-top:16px"></div>
+      <div class="card">
+        <div class="card-head"><h3>Server environment variables</h3></div>
+        <p class="muted">Integrations connect only when these are set on the host (Render / Railway / Docker). Keys are read by the server only — they are never stored in this app or in the repo.</p>
+        <table class="table env-table">
+          <thead><tr><th>Variable</th><th>Used for</th></tr></thead>
+          <tbody>
+            <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string</td></tr>
+            <tr><td><code>JWT_SECRET</code></td><td>Signing login tokens</td></tr>
+            <tr><td><code>LIVEKIT_URL</code></td><td>LiveKit Cloud project URL (wss://…)</td></tr>
+            <tr><td><code>LIVEKIT_API_KEY</code></td><td>LiveKit API key — minting room tokens</td></tr>
+            <tr><td><code>LIVEKIT_API_SECRET</code></td><td>LiveKit API secret — signing tokens</td></tr>
+            <tr><td><code>DEEPGRAM_API_KEY</code></td><td>Speech-to-text and Deepgram Aura text-to-speech</td></tr>
+            <tr><td><code>GROQ_API_KEY</code></td><td>LLM — voice replies, call analysis and knowledge answers</td></tr>
+            <tr><td><code>OPENAI_API_KEY</code></td><td>Optional — only used when LLM_PROVIDER=openai</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ORGANIZATION -->
+    <section class="view hidden" id="view-organization">
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Organization profile</h3></div>
+          <form id="orgForm">
+            <label>Name<input type="text" id="orgName" required></label>
+            <label>Industry<input type="text" id="orgIndustry" placeholder="SaaS, Real estate, Education…"></label>
+            <label>Website<input type="url" id="orgWebsite" placeholder="https://"></label>
+            <label>Timezone<input type="text" id="orgTimezone" placeholder="Asia/Kolkata"></label>
+            <label>Calling hours<input type="text" id="orgCallingHours" placeholder="09:00–19:00"></label>
+            <div class="auth-error" id="orgError"></div>
+            <button class="btn btn-primary" type="submit">Save profile</button>
+            <span class="saved-note" id="orgSaved"></span>
+          </form>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Members &amp; roles</h3></div>
+          <div id="membersList"></div>
+          <form id="memberForm" class="member-form">
+            <label>Email<input type="email" id="memberEmail" required placeholder="teammate@company.com"></label>
+            <label>Role
+              <select id="memberRole">
+                <option>Sales Representative</option><option>Sales Manager</option><option>Administrator</option><option>Owner</option>
+              </select>
+            </label>
+            <div class="auth-error" id="memberError"></div>
+            <button class="btn btn-primary" type="submit">Add member</button>
+            <p class="muted small">The teammate must already have a SalesPilot account with this email; adding links them to this organization with the chosen role.</p>
+          </form>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><h3>Data controls</h3></div>
+        <p class="muted">Export or permanently delete all workspace data for this organization. Export and wipe are restricted to Owner/Admin on the server.</p>
+        <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:12px">
+          <button class="btn btn-primary" id="exportOrgBtn" type="button">Export all workspace data</button>
+          <button class="btn btn-danger" id="wipeBtn" type="button">Delete all workspace data</button>
+        </div>
+        <div id="wipeZone" class="hidden">
+          <p class="voice-error">This permanently deletes workspace data. Type DELETE to confirm:</p>
+          <div style="display:flex;gap:9px;flex-wrap:wrap"><input id="wipeConfirm" placeholder="DELETE" style="max-width:220px"><button class="btn btn-danger" id="wipeConfirmBtn" type="button">Confirm delete</button><button class="btn btn-ghost" id="wipeCancelBtn" type="button">Cancel</button></div>
+        </div>
+        <div id="dataControlsResult" class="muted" style="margin-top:10px;white-space:pre-wrap"></div>
+      </div>
+    </section>
+
+    <!-- KB -->
+    <section class="view hidden" id="view-kb">
+      <div class="card" style="margin-bottom:16px"><p class="muted" style="margin:0">Answers come only from uploaded documents. If the knowledge base has no relevant content, retrieval and Ask will say so honestly — nothing is invented.</p></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Upload document</h3></div>
+          <label>File (.pdf, .docx, .txt, .csv)<input type="file" id="kbFile" accept=".pdf,.docx,.txt,.csv"></label>
+          <button class="btn btn-primary" id="kbUploadBtn" type="button">Upload file</button>
+          <div class="auth-error" id="kbUploadError"></div>
+          <hr style="border-color:var(--border-soft)">
+          <form id="kbTextForm"><label>Document name<input id="kbTextName" required></label><label>Text<textarea id="kbTextBody" rows="6" required></textarea></label><button class="btn btn-primary" type="submit">Add text document</button></form>
+        </div>
+        <div class="card"><div class="card-head"><h3>Test retrieval</h3></div>
+          <label>Question<input id="kbRetrieveQ" placeholder="What is the pricing?"></label>
+          <button class="btn btn-primary" id="kbRetrieveBtn" type="button">Retrieve chunks</button>
+          <div id="kbRetrieveResults" style="margin-top:12px"></div>
+          <hr style="border-color:var(--border-soft)">
+          <div class="card-head"><h3>Ask the knowledge base</h3></div>
+          <label>Question<input id="kbAskQ" placeholder="Ask based only on documents"></label>
+          <button class="btn btn-primary" id="kbAskBtn" type="button">Ask</button>
+          <div id="kbAskResults" style="margin-top:12px"></div>
+        </div>
+      </div>
+      <div class="card table-card" style="margin-top:16px"><table class="table"><thead><tr><th>Name</th><th>Type</th><th>Status</th><th>Chunks</th><th>Embedding model</th><th></th></tr></thead><tbody id="kbTbody"></tbody></table><div class="empty hidden" id="kbEmpty"><p>No documents yet. Upload a file or paste text.</p></div></div>
+      <div class="card hidden" id="kbChunksCard" style="margin-top:16px"><div class="card-head"><h3 id="kbChunksTitle">Chunks</h3></div><div id="kbChunks"></div></div>
+    </section>
+
+    <!-- APPOINTMENTS -->
+    <section class="view hidden" id="view-appointments">
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Book appointment</h3></div>
+          <form id="apptForm">
+            <label>Lead<select id="apptLead"></select></label>
+            <label>Title<input id="apptTitle" required placeholder="Discovery call"></label>
+            <label>Starts at<input type="datetime-local" id="apptStarts" required></label>
+            <label>Duration (minutes)<input type="number" id="apptDuration" value="30" min="5"></label>
+            <label>Timezone<input id="apptTimezone" value="Asia/Kolkata"></label>
+            <label>Notes<textarea id="apptNotes" rows="2"></textarea></label>
+            <div class="auth-error" id="apptError"></div>
+            <div id="apptConflict" class="hidden" style="margin-bottom:10px"></div>
+            <button class="btn btn-primary" type="submit">Create appointment</button>
+          </form>
+        </div>
+        <div class="card"><div class="card-head"><h3>Appointments</h3></div><div id="appointmentsList"></div><div class="empty hidden" id="appointmentsEmpty"><p>No appointments yet.</p></div></div>
+      </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="view hidden" id="view-tasks">
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Tasks &amp; follow-ups</h3></div><div id="tasksList"></div><div class="empty hidden" id="tasksEmpty"><p>No tasks yet.</p></div></div>
+        <div class="card"><div class="card-head"><h3>Create follow-up</h3></div>
+          <form id="taskForm"><label>Lead<select id="taskLead"></select></label><label>Reason<input id="taskReason" required></label><label>Due at<input type="datetime-local" id="taskDue"></label><div class="auth-error" id="taskError"></div><button class="btn btn-primary" type="submit">Create follow-up</button></form>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section class="view hidden" id="view-analytics">
+      <div class="toolbar"><div class="toolbar-group"><label style="margin:0">Range<select id="analyticsRange"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="0">All time</option></select></label>
+      <button class="btn btn-ghost" id="exportLeadsCsvBtn" type="button">Export leads CSV</button><button class="btn btn-ghost" id="exportSummaryCsvBtn" type="button">Export summary CSV</button></div></div>
+      <div id="analyticsBody"><p class="muted">Loading analytics…</p></div>
+    </section>
+
+    <!-- COMPLIANCE -->
+    <section class="view hidden" id="view-compliance">
+      <div class="card" style="margin-bottom:16px"><div class="card-head"><h3>Compliance &amp; Launch Readiness</h3></div>
+      <p class="muted">Guidance only — not legal advice. Confirm requirements with your legal advisor and telecom provider before launching in India.</p>
+      <div id="launchChecklist"></div></div>
+      <div class="grid-2">
+        <div class="card"><h3>TRAI / DLT registration (India)</h3><ol class="muted"><li>Register your business (Principal Entity) on your operator's DLT portal.</li><li>Register headers (sender IDs) and message/call templates as required.</li><li>Keep DLT registration details with your telephony provider before placing commercial calls.</li><li>Respect calling-hour and consent rules for promotional communication.</li></ol></div>
+        <div class="card"><h3>Consent &amp; Do Not Contact</h3><p class="muted">SalesPilot enforces Do Not Contact: leads flagged DNC are blocked from starting a call — the server returns a 403 and the detail is shown verbatim in Live Voice Testing. Keep consent records (the Consent flag on each lead) up to date and honour opt-outs immediately.</p></div>
+        <div class="card"><h3>Call recording &amp; AI disclosure</h3><p class="muted">Disclose at the start of a call that the caller is an AI agent and that the call may be recorded/transcribed, where applicable law requires it. Keep transcripts only as long as your retention policy allows.</p></div>
+        <div class="card"><h3>DPDP basics</h3><p class="muted">India's DPDP Act: collect personal data for a stated purpose, with consent; allow access/correction/erasure requests (use Organization → Data controls export/wipe); secure data and report breaches as required. This is general guidance, not legal advice.</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ LEAD MODAL ============ -->
+<div class="modal-wrap hidden" id="leadModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="leadModalTitle">Add lead</h3><button class="icon-btn" data-close="leadModal" type="button">✕</button></div>
+    <form id="leadForm">
+      <div class="form-grid">
+        <label>Full name<input id="lf_full_name" required></label>
+        <label>Company<input id="lf_company"></label>
+        <label>Phone<input id="lf_phone"></label>
+        <label>Email<input type="email" id="lf_email"></label>
+        <label>Location<input id="lf_location"></label>
+        <label>Preferred language
+          <select id="lf_preferred_language"><option>English</option><option>Hindi</option><option>Hinglish</option></select></label>
+        <label>Industry<input id="lf_industry"></label>
+        <label>Lead source<input id="lf_lead_source" placeholder="Website, Referral, Ads…"></label>
+        <label>Budget<input id="lf_budget" placeholder="₹50,000 / $1,000…"></label>
+        <label>Decision authority<input id="lf_decision_authority" placeholder="Self, Manager, Committee…"></label>
+        <label>Purchase timeline<input id="lf_purchase_timeline" placeholder="This month, Q3…"></label>
+        <label>Lead score (0–100)<input type="number" id="lf_lead_score" min="0" max="100" placeholder="Leave blank if unknown"></label>
+        <label>Status<select id="lf_lead_status"></select></label>
+        <label>Next follow-up<input type="date" id="lf_next_followup"></label>
+        <label class="span2">Requirements<textarea id="lf_requirements" rows="2"></textarea></label>
+        <label class="span2">Pain points<textarea id="lf_pain_points" rows="2"></textarea></label>
+        <label class="check"><input type="checkbox" id="lf_consent"> Consent to be called</label>
+        <label class="check"><input type="checkbox" id="lf_do_not_contact"> Do not contact</label>
+      </div>
+      <div class="auth-error" id="leadError"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-close="leadModal" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save lead</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ AGENT MODAL ============ -->
+<div class="modal-wrap hidden" id="agentModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="agentModalTitle">New agent</h3><button class="icon-btn" data-close="agentModal" type="button">✕</button></div>
+    <form id="agentForm">
+      <div class="form-grid">
+        <label>Agent name<input id="af_name" required placeholder="Aarav"></label>
+        <label>Company name<input id="af_company_name"></label>
+        <label class="span2">Description<textarea id="af_description" rows="2"></textarea></label>
+        <label>Personality
+          <select id="af_personality"><option>Professional</option><option>Friendly</option><option>Consultative</option><option>Persuasive</option><option>Concise</option><option>Conversational</option></select></label>
+        <label>Voice provider<input id="af_voice_provider" placeholder="Deepgram Aura"></label>
+        <label>Voice name<input id="af_voice_name" placeholder="aura-2-thalia-en"></label>
+        <label>Speaking speed<input type="number" step="0.1" min="0.5" max="2" id="af_speaking_speed" placeholder="1.0"></label>
+        <label>Max call duration (min)<input type="number" min="1" id="af_max_call_duration" placeholder="15"></label>
+        <label>Calling hours<input id="af_calling_hours" placeholder="09:00–19:00"></label>
+        <fieldset class="span2 lang-fieldset"><legend>Languages</legend>
+          <label class="check"><input type="checkbox" class="af_lang" value="English"> English</label>
+          <label class="check"><input type="checkbox" class="af_lang" value="Hindi"> Hindi</label>
+          <label class="check"><input type="checkbox" class="af_lang" value="Hinglish"> Hinglish</label>
+        </fieldset>
+        <label class="span2">Sales objectives<textarea id="af_sales_objectives" rows="2"></textarea></label>
+        <label class="span2">Target audience<textarea id="af_target_audience" rows="2"></textarea></label>
+        <label class="span2">Qualification questions<textarea id="af_qualification_questions" rows="2" placeholder="One per line"></textarea></label>
+        <label class="span2">Escalation conditions<textarea id="af_escalation_conditions" rows="2"></textarea></label>
+        <label class="span2">Follow-up behaviour<textarea id="af_followup_behaviour" rows="2"></textarea></label>
+        <label class="check"><input type="checkbox" id="af_is_active"> Active</label>
+      </div>
+      <div class="auth-error" id="agentError"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" data-close="agentModal" type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save agent</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============ CALL DETAIL MODAL ============ -->
+<div class="modal-wrap hidden" id="callModal">
+  <div class="modal">
+    <div class="modal-head"><h3>Call detail</h3><button class="icon-btn" data-close="callModal" type="button">✕</button></div>
+    <div id="callDetailMeta" class="call-meta"></div>
+    <div id="callContextBlock"></div>
+    <div class="transcript" id="callTranscript"></div>
+    <div id="callAnalysisPanel" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<!-- ============ LEAD DETAIL MODAL ============ -->
+<div class="modal-wrap hidden" id="leadDetailModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="leadDetailTitle">Lead</h3><button class="icon-btn" data-close="leadDetailModal" type="button">✕</button></div>
+    <div id="leadDetailBody"></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
