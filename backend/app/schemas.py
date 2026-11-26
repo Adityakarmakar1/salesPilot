@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class ORMModel(BaseModel):
@@ -150,6 +150,18 @@ class AgentBase(BaseModel):
     voice_name: str = "aura-2-thalia-en"
     speaking_speed: float = 1.0
     max_call_duration: int = 600
+
+    @field_validator("speaking_speed", mode="before")
+    @classmethod
+    def _speaking_speed_default(cls, v):
+        # The web form sends null for a blank field; blank means "use default".
+        return 1.0 if v is None else v
+
+    @field_validator("max_call_duration", mode="before")
+    @classmethod
+    def _max_call_duration_default(cls, v):
+        return 600 if v is None else v
+
     calling_hours: str = ""
     sales_objectives: str = ""
     target_audience: str = ""
