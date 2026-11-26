@@ -34,22 +34,50 @@ def llm_status() -> dict:
     return {"provider": provider, "model": model, "connected": bool(api_key)}
 
 
+# Groq retired llama-3.3-70b-versatile / llama-3.1-8b-instant for free and
+# developer tiers on 2026-08-16; the recommended replacements are the
+# gpt-oss models. If the configured model is ever missing on the account,
+# fall back through these instead of failing the request.
+GROQ_FALLBACK_MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b"]
+
+
+def _is_model_missing(resp) -> bool:
+    if resp.status_code not in (400, 404):
+        return False
+    try:
+        err = resp.json().get("error", {})
+        return err.get("code") == "model_not_found" or "does not exist" in str(err.get("message", ""))
+    except ValueError:
+        return "does not exist" in resp.text
+
+
 def chat_completion(messages, json_mode: bool = False) -> str:
     provider, url, api_key, model = _provider_config()
     if not api_key:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, _missing_key_detail(provider))
 
-    payload: dict = {"model": model, "messages": messages}
-    if json_mode:
-        payload["response_format"] = {"type": "json_object"}
+    candidates = [model]
+    if provider == "groq":
+        candidates += [m for m in GROQ_FALLBACK_MODELS if m != model]
+
     headers = {"Authorization": f"Bearer {api_key}"}
+    resp = None
     try:
         with httpx.Client(timeout=120) as client:
-            resp = client.post(url, headers=headers, json=payload)
-            if json_mode and resp.status_code == 400:
-                # Some models reject response_format — retry once without it.
-                payload.pop("response_format", None)
+            for candidate in candidates:
+                payload: dict = {"model": candidate, "messages": messages}
+                if json_mode:
+                    payload["response_format"] = {"type": "json_object"}
                 resp = client.post(url, headers=headers, json=payload)
+                if _is_model_missing(resp):
+                    continue
+                if json_mode and resp.status_code == 400:
+                    # Some models reject response_format — retry once without it.
+                    payload.pop("response_format", None)
+                    resp = client.post(url, headers=headers, json=payload)
+                    if _is_model_missing(resp):
+                        continue
+                break
     except httpx.HTTPError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"LLM request failed: {exc}")
     if resp.status_code != 200:
